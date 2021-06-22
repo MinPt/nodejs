@@ -1,39 +1,65 @@
 const express = require("express");
-const mongoose = require('mongoose');
-const Joi = require("joi");
+const { Template, validateTemplate} = require('../model/template');
 
 const router = express.Router();
 
-const Template = mongoose.model("Template", new mongoose.Schema({
-  name: String,
-  userId: mongoose.ObjectId,
-  data: { frame: [{}], idx: Number},
-  date: { type: Date, default: Date.now },
-  isDefault: { type: Boolean, default: false },
-}));
 
-function validateTemplate(template) {
-  const schema = Joi.object({
-    name: Joi.string().min(4).max(40).required(),
-    data: Joi.object({
-      frame: Joi.array().items(Joi.object()),
-      idx: Joi.number().min(0).required(),
-    }),
-    date: Joi.date().required(),
-    isDefault: Joi.boolean(),
+
+
+
+router.get("/", async (req, res) => {
+  const templates = await Template.find().sort("isDefault");
+  res.send(templates);
+});
+
+router.get("/:id", async (req, res) => {
+  const template = await Template.findById(req.params.id);
+
+  if (!template) return res.status(404).send("Template with such id not found");
+
+  res.send(template);
+});
+
+router.post("/", async (req, res) => {
+  const { error } = validateTemplate(req.body);
+  if (error) return res.status(400).send(error.details[0].message);
+
+  let template = new Template({
+    name: req.body.name,
+    date: Date.now(),
+    data: req.body.data,
+    isDefault: req.body.isDefault,
   });
 
-  return schema.validate(genre);
-}
+  template = await template.save();
+  res.send(template);
+});
 
-router.get('/', async (req, res) => {
-  const templates = await Template.find().sort('isDefault');
-  res.send(templates);
-})
+router.put("/:id", async (req, res) => {
+  const { error } = validateTemplate(req.body);
+  if (error) return res.status(400).send(error.details[0].message);
 
-router.post('/', async (req, res) => {
-  const { error } = validateTemplate(req.body)
+  const template = await Template.findByIdAndUpdate(
+    req.params.id,
+    {
+      name: req.body.name,
+      data: req.body.data,
+      isDefault: req.body.isDefault,
+    },
+    { new: true }
+  );
 
-  const templates = await Template.find().sort('isDefault');
-  res.send(templates);
-})
+  if (!template) return res.status(404).send("Template with such id not found");
+
+  res.send(template);
+});
+
+router.delete("/:id", async (req, res) => {
+  const template = await Template.findByIdAndDelete(req.params.id);
+
+  if (!template) return res.status(404).send("Template with such id not found");
+
+  res.send(template);
+});
+
+module.exports = router;
